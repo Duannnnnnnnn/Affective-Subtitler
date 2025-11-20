@@ -3,6 +3,9 @@ import os
 import tempfile
 import pandas as pd
 import plotly.express as px
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+from io import BytesIO
 import utils
 
 st.set_page_config(page_title="Affective Subtitler", layout="wide")
@@ -60,14 +63,13 @@ if uploaded_file is not None:
         # Prepare data for visualization
         df = pd.DataFrame(results)
         
-        col1, col2 = st.columns([2, 1])
+        # Create three columns for better layout
+        col1, col2, col3 = st.columns([2, 1, 1])
         
         with col1:
-            st.subheader("2. Emotion Trends")
+            st.subheader("2. Emotion Timeline")
             if not df.empty:
-                # Create a scatter plot or line chart
-                # We plot emotion confidence over time (using start time)
-                # Color by emotion label
+                # Create a scatter plot showing emotion confidence over time
                 fig = px.scatter(
                     df, 
                     x="start", 
@@ -78,32 +80,76 @@ if uploaded_file is not None:
                     title="Emotion Timeline",
                     labels={"start": "Time (s)", "confidence": "Confidence Score"}
                 )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Also a simple line chart for dominant emotion confidence? 
-                # Or maybe a bar chart of emotion counts
-                st.markdown("#### Emotion Distribution")
-                emotion_counts = df['emotion'].value_counts().reset_index()
-                emotion_counts.columns = ['emotion', 'count']
-                fig_bar = px.bar(emotion_counts, x='emotion', y='count', color='emotion')
-                st.plotly_chart(fig_bar, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             else:
                 st.info("No speech segments detected.")
-
+        
         with col2:
-            st.subheader("3. Transcript & Subtitles")
-            
+            st.subheader("Emotion Distribution")
+            if not df.empty:
+                # Pie Chart for emotion percentages
+                emotion_counts = df['emotion'].value_counts().reset_index()
+                emotion_counts.columns = ['emotion', 'count']
+                fig_pie = px.pie(
+                    emotion_counts, 
+                    values='count', 
+                    names='emotion',
+                    title="Overall Emotion %"
+                )
+                st.plotly_chart(fig_pie, width='stretch')
+            else:
+                st.info("No data")
+        
+        with col3:
+            st.subheader("High-Arousal Words")
+            if not df.empty:
+                # Filter for 'angry' and 'happy' emotions
+                high_arousal_df = df[df['emotion'].isin(['angry', 'happy'])]
+                
+                if not high_arousal_df.empty:
+                    # Combine all text from angry/happy segments
+                    text_combined = " ".join(high_arousal_df['text'].tolist())
+                    
+                    if text_combined.strip():
+                        # Generate Word Cloud
+                        wordcloud = WordCloud(
+                            width=400, 
+                            height=400, 
+                            background_color='white',
+                            colormap='Reds'
+                        ).generate(text_combined)
+                        
+                        # Display Word Cloud using matplotlib
+                        fig_wc, ax = plt.subplots(figsize=(5, 5))
+                        ax.imshow(wordcloud, interpolation='bilinear')
+                        ax.axis('off')
+                        ax.set_title("Angry/Happy Words", fontsize=12)
+                        st.pyplot(fig_wc)
+                    else:
+                        st.info("No text in angry/happy segments")
+                else:
+                    st.info("No angry/happy emotions detected")
+            else:
+                st.info("No data")
+
+        # Transcript section (full width below visualizations)
+        st.subheader("3. Transcript & Subtitles")
+        
+        col_download, col_transcript = st.columns([1, 3])
+        
+        with col_download:
             # Generate SRT
             srt_content = utils.generate_srt(results)
             
             # Download Button
             st.download_button(
-                label="Download .SRT File",
+                label="📥 Download .SRT File",
                 data=srt_content,
                 file_name=f"{os.path.splitext(uploaded_file.name)[0]}_emotion.srt",
                 mime="text/plain"
             )
-            
+        
+        with col_transcript:
             # Display Transcript
             st.markdown("#### Transcript Preview")
             for item in results:
