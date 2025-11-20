@@ -139,6 +139,7 @@ if uploaded_file is not None:
                                         # Find Chinese font
                                         font_path = None
                                         possible_fonts = [
+                                            'font/NotoSansTC-Regular.ttf'
                                             '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
                                             '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
                                             '/System/Library/Fonts/PingFang.ttc',
