@@ -84,8 +84,12 @@ def analyze_emotion(audio_segment, sr, model_name="ehcalabres/wav2vec2-lg-xlsr-e
     
     # Heuristic: if top 2 are close (< 5%), favor high arousal
     if (top1['score'] - top2['score']) < 0.05:
-        high_arousal = ["happy", "angry", "fear", "surprise"]
-        if top2['label'] in high_arousal and top1['label'] not in high_arousal:
+        # Normalize to lowercase for comparison
+        high_arousal = ["happy", "angry", "fear", "surprise", "joy", "anger", "surprised"]
+        top1_lower = top1['label'].lower().strip()
+        top2_lower = top2['label'].lower().strip()
+        
+        if top2_lower in high_arousal and top1_lower not in high_arousal:
             emotion = top2['label']
             confidence = top2['score']
             print(f"Tie-breaker: Switched {top1['label']} -> {top2['label']}")

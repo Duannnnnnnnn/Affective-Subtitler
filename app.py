@@ -103,21 +103,49 @@ if uploaded_file is not None:
         with col3:
             st.subheader("High-Arousal Words")
             if not df.empty:
-                # Filter for 'angry' and 'happy' emotions
-                high_arousal_df = df[df['emotion'].isin(['angry', 'happy'])]
+                # DEBUG: Show all detected emotions
+                unique_emotions = df['emotion'].unique().tolist()
+                st.caption(f"Detected: {', '.join(unique_emotions)}")
+                
+                # Normalize emotions to lowercase for filtering
+                df['emotion_lower'] = df['emotion'].str.lower().str.strip()
+                
+                # Filter for high-arousal emotions (case-insensitive)
+                # Include common variations: angry/anger, happy/joy, surprise/surprised
+                high_arousal_keywords = ['angry', 'anger', 'happy', 'joy', 'surprise', 'surprised']
+                high_arousal_df = df[df['emotion_lower'].isin(high_arousal_keywords)]
                 
                 if not high_arousal_df.empty:
                     # Combine all text from angry/happy segments
                     text_combined = " ".join(high_arousal_df['text'].tolist())
                     
                     if text_combined.strip():
-                        # Generate Word Cloud
-                        wordcloud = WordCloud(
-                            width=400, 
-                            height=400, 
-                            background_color='white',
-                            colormap='Reds'
-                        ).generate(text_combined)
+                        # Generate Word Cloud with Chinese font support
+                        import os
+                        # Try to find a Chinese font
+                        font_path = None
+                        possible_fonts = [
+                            '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+                            '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+                            '/System/Library/Fonts/PingFang.ttc',  # macOS
+                            'C:\\Windows\\Fonts\\msyh.ttc',  # Windows Microsoft YaHei
+                        ]
+                        for font in possible_fonts:
+                            if os.path.exists(font):
+                                font_path = font
+                                break
+                        
+                        wc_params = {
+                            'width': 400,
+                            'height': 400,
+                            'background_color': 'white',
+                            'colormap': 'Reds',
+                            'regexp': r"[\w']+",  # Support unicode characters
+                        }
+                        if font_path:
+                            wc_params['font_path'] = font_path
+                        
+                        wordcloud = WordCloud(**wc_params).generate(text_combined)
                         
                         # Display Word Cloud using matplotlib
                         fig_wc, ax = plt.subplots(figsize=(5, 5))
@@ -125,10 +153,12 @@ if uploaded_file is not None:
                         ax.axis('off')
                         ax.set_title("Angry/Happy Words", fontsize=12)
                         st.pyplot(fig_wc)
+                        
+                        st.caption(f"Words from {len(high_arousal_df)} segments")
                     else:
-                        st.info("No text in angry/happy segments")
+                        st.info("No text in high-arousal segments")
                 else:
-                    st.info("No angry/happy emotions detected")
+                    st.info("No high-arousal emotions detected")
             else:
                 st.info("No data")
 
