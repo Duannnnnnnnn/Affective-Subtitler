@@ -4,7 +4,8 @@ transformers
 librosa
 scipy
 torch
-matplotlib
+torchaudio
+matplotlib>=3.9.0
 plotly
 ffmpeg-python
 soundfile

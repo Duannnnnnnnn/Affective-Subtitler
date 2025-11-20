@@ -21,11 +21,15 @@ def load_ser_model(model_name="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-rec
 def transcribe_with_whisperx(file_path, model_name="base"):
     """
     Transcribes audio using WhisperX with word-level alignment.
+    NOTE: Using CPU mode to avoid cuDNN compatibility issues with torch 2.8.0
     """
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    compute_type = "float16" if torch.cuda.is_available() else "int8" # or float32 for cpu
+    # Force CPU mode to bypass cuDNN crash
+    device = "cpu"
+    compute_type = "int8"  # CPU-compatible compute type
     
     print(f"Loading WhisperX model: {model_name} on {device} ({compute_type})...")
+    print("Note: Using CPU mode for WhisperX to avoid cuDNN compatibility issues")
+    
     # 1. Transcribe with original whisper (batched)
     model = whisperx.load_model(model_name, device, compute_type=compute_type)
     audio = whisperx.load_audio(file_path)
@@ -34,8 +38,6 @@ def transcribe_with_whisperx(file_path, model_name="base"):
     # Explicitly delete model to free memory
     del model
     gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
     
     # 2. Align whisper output
     language_code = result["language"]
@@ -50,8 +52,6 @@ def transcribe_with_whisperx(file_path, model_name="base"):
     # Explicitly delete alignment model
     del model_a
     gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
         
     return result_aligned["segments"]
 
