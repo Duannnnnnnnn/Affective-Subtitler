@@ -3,6 +3,8 @@ import librosa
 import torch
 import numpy as np
 from transformers import pipeline
+from collections import Counter
+import jieba
 import datetime
 import gc
 
@@ -149,12 +151,85 @@ def format_timestamp(seconds):
     Formats seconds into SRT timestamp format: HH:MM:SS,mmm
     """
     td = datetime.timedelta(seconds=seconds)
-    total_seconds = int(td.total_seconds())
-    hours = total_seconds // 3600
-    minutes = (total_seconds % 3600) // 60
-    secs = total_seconds % 60
-    millis = int(td.microseconds / 1000)
-    return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
+    hours, remainder = divmod(td.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    milliseconds = int((td.microseconds / 1000))
+    return f"{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}"
+
+def analyze_emotion_word_frequency(results, top_n=10):
+    """
+    Analyze word frequency per emotion with Chinese and English support.
+    
+    Args:
+        results: List of dictionaries containing 'text', 'emotion', 'start', 'end'
+        top_n: Number of top words to return per emotion (default: 10)
+    
+    Returns:
+        Dictionary of {emotion: [(word, count), ...]} with top N words per emotion
+    """
+    # Comprehensive stop words for Chinese and English
+    chinese_stop_words = set([
+        '的', '了', '是', '我', '你', '他', '她', '它', '在', '有', '和', '就', '不',
+        '人', '都', '一', '一個', '一个', '上', '下', '来', '去', '着', '过', '到', '说',
+        '对', '为', '这', '那', '中', '个', '能', '好', '也', '会', '还', '要', '被',
+        '从', '与', '及', '於', '于', '但', '很', '么', '吗', '呢', '吧', '啊', '哦',
+        '嗯', '啦', '吗', '哪', '呀', '呢', '嘛', '喔', '哩', '哦', '所', '因', '于'
+    ])
+    
+    english_stop_words = set([
+        'the', 'is', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+        'of', 'with', 'by', 'from', 'as', 'that', 'this', 'it', 'be', 'are', 'was',
+        'were', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+        'could', 'should', 'can', 'may', 'might', 'i', 'you', 'he', 'she', 'we', 'they',
+        'my', 'your', 'his', 'her', 'its', 'our', 'their', 'me', 'him', 'them', 'us',
+        'what', 'which', 'who', 'when', 'where', 'why', 'how', 'so', 'than', 'too',
+        'just', 'if', 'about', 'into', 'through', 'during', 'before', 'after', 'above',
+        'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there',
+        'all', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no',
+        'only', 'own', 'same', 'than', 'very', 'well', 'um', 'uh', 'oh', 'yeah', 'yes',
+        'no', 'okay', 'ok', 'like', 'know', 'think', 'mean', 'get', 'got', 'going'
+    ])
+    
+    all_stop_words = chinese_stop_words | english_stop_words
+    
+    # Group text by emotion
+    emotion_texts = {}
+    for item in results:
+        emotion = item['emotion'].lower().strip()
+        text = item['text']
+        
+        if emotion not in emotion_texts:
+            emotion_texts[emotion] = []
+        emotion_texts[emotion].append(text)
+    
+    # Analyze word frequency for each emotion
+    emotion_word_freq = {}
+    
+    for emotion, texts in emotion_texts.items():
+        # Combine all text for this emotion
+        combined_text = ' '.join(texts)
+        
+        # Tokenize using jieba for Chinese + English
+        words = jieba.lcut(combined_text)
+        
+        # Filter: remove stop words, single characters (except important ones), and punctuation
+        filtered_words = []
+        for word in words:
+            word_lower = word.lower().strip()
+            # Skip if empty, stop word, or just punctuation
+            if (word_lower and 
+                word_lower not in all_stop_words and 
+                not all(c in '，。！？；：""''（）【】《》、,,..!?;:\'"()[]<>/\\-_=+*&^%$#@~`' for c in word) and
+                len(word) > 1):  # Keep words longer than 1 character
+                filtered_words.append(word)
+        
+        # Count frequencies
+        word_counts = Counter(filtered_words)
+        
+        # Get top N most common words
+        emotion_word_freq[emotion] = word_counts.most_common(top_n)
+    
+    return emotion_word_freq
 
 def generate_srt(results):
     """

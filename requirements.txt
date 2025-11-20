@@ -12,3 +12,4 @@ soundfile
 scikit-learn>=1.5
 numexpr>=2.10
 wordcloud
+jieba

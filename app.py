@@ -100,65 +100,73 @@ if uploaded_file is not None:
             else:
                 st.info("No data")
         
+        
         with col3:
-            st.subheader("High-Arousal Words")
+            st.subheader("📊 Content Emotion Word Frequency")
+            st.caption("⚠️ **Note:** This analysis aggregates content across all speakers and shows the most frequent keywords when specific emotions occur.")
+            
             if not df.empty:
+                # Get word frequency analysis
+                word_freq_data = utils.analyze_emotion_word_frequency(results, top_n=10)
+                
                 # DEBUG: Show all detected emotions
                 unique_emotions = df['emotion'].unique().tolist()
                 st.caption(f"Detected: {', '.join(unique_emotions)}")
                 
-                # Normalize emotions to lowercase for filtering
-                df['emotion_lower'] = df['emotion'].str.lower().str.strip()
-                
-                # Filter for high-arousal emotions (case-insensitive)
-                # Include common variations: angry/anger, happy/joy, surprise/surprised
-                high_arousal_keywords = ['angry', 'anger', 'happy', 'joy', 'surprise', 'surprised']
-                high_arousal_df = df[df['emotion_lower'].isin(high_arousal_keywords)]
-                
-                if not high_arousal_df.empty:
-                    # Combine all text from angry/happy segments
-                    text_combined = " ".join(high_arousal_df['text'].tolist())
+                # Create tabs for each emotion
+                if word_freq_data:
+                    # Sort emotions by count (most common first)
+                    emotion_counts = df['emotion'].str.lower().value_counts()
+                    sorted_emotions = [e for e in emotion_counts.index if e in word_freq_data and word_freq_data[e]]
                     
-                    if text_combined.strip():
-                        # Generate Word Cloud with Chinese font support
-                        import os
-                        # Try to find a Chinese font
-                        font_path = None
-                        possible_fonts = [
-                            '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
-                            '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
-                            '/System/Library/Fonts/PingFang.ttc',  # macOS
-                            'C:\\Windows\\Fonts\\msyh.ttc',  # Windows Microsoft YaHei
-                        ]
-                        for font in possible_fonts:
-                            if os.path.exists(font):
-                                font_path = font
-                                break
+                    if sorted_emotions:
+                        tabs = st.tabs([f"{e.capitalize()} ({emotion_counts[e]})" for e in sorted_emotions])
                         
-                        wc_params = {
-                            'width': 400,
-                            'height': 400,
-                            'background_color': 'white',
-                            'colormap': 'Reds',
-                            'regexp': r"[\w']+",  # Support unicode characters
-                        }
-                        if font_path:
-                            wc_params['font_path'] = font_path
-                        
-                        wordcloud = WordCloud(**wc_params).generate(text_combined)
-                        
-                        # Display Word Cloud using matplotlib
-                        fig_wc, ax = plt.subplots(figsize=(5, 5))
-                        ax.imshow(wordcloud, interpolation='bilinear')
-                        ax.axis('off')
-                        ax.set_title("Angry/Happy Words", fontsize=12)
-                        st.pyplot(fig_wc)
-                        
-                        st.caption(f"Words from {len(high_arousal_df)} segments")
-                    else:
-                        st.info("No text in high-arousal segments")
-                else:
-                    st.info("No high-arousal emotions detected")
+                        for tab, emotion in zip(tabs, sorted_emotions):
+                            with tab:
+                                top_words = word_freq_data[emotion]
+                                
+                                if top_words:
+                                    # Display Top 10 list
+                                    st.markdown("**Top 10 Words:**")
+                                    for rank, (word, count) in enumerate(top_words, 1):
+                                        st.write(f"{rank}. **{word}** (Count: {count})")
+                                    
+                                    # Generate Word Cloud for this emotion
+                                    emotion_text = ' '.join([word for word, _ in top_words for _ in range(int(count))])
+                                    
+                                    if emotion_text.strip():
+                                        # Find Chinese font
+                                        font_path = None
+                                        possible_fonts = [
+                                            '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+                                            '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+                                            '/System/Library/Fonts/PingFang.ttc',
+                                            'C:\\Windows\\Fonts\\msyh.ttc',
+                                        ]
+                                        for font in possible_fonts:
+                                            if os.path.exists(font):
+                                                font_path = font
+                                                break
+                                        
+                                        wc_params = {
+                                            'width': 350,
+                                            'height': 250,
+                                            'background_color': 'white',
+                                            'colormap': 'Blues' if emotion in ['sad', 'fear', 'neutral'] else 'Reds',
+                                        }
+                                        if font_path:
+                                            wc_params['font_path'] = font_path
+                                        
+                                        wordcloud = WordCloud(**wc_params).generate(emotion_text)
+                                        
+                                        fig_wc, ax = plt.subplots(figsize=(4, 3))
+                                        ax.imshow(wordcloud, interpolation='bilinear')
+                                        ax.axis('off')
+                                        st.pyplot(fig_wc)
+                                        plt.close(fig_wc)
+                                else:
+                                    st.info("No words after filtering")
             else:
                 st.info("No data")
 
