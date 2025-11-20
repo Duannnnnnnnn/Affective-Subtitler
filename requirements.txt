@@ -1,5 +1,5 @@
 streamlit
-openai-whisper
+git+https://github.com/m-bain/whisperx.git
 transformers
 librosa
 scipy
@@ -8,4 +8,5 @@ matplotlib
 plotly
 ffmpeg-python
 soundfile
-numpy
+scikit-learn>=1.5
+numexpr>=2.10

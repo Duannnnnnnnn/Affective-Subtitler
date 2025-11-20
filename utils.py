@@ -1,22 +1,10 @@
-import whisper
+import whisperx
 import librosa
 import torch
 import numpy as np
 from transformers import pipeline
 import datetime
-
-# Initialize models globally to avoid reloading
-# In a real app, we might want to load these lazily or cache them
-asr_model = None
-ser_pipeline = None
-
-def load_asr_model(model_name="base"):
-    global asr_model
-    if asr_model is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"Loading Whisper model: {model_name} on {device}...")
-        asr_model = whisper.load_model(model_name, device=device)
-    return asr_model
+import gc
 
 # Cache for multiple models
 ser_pipelines = {}
@@ -30,49 +18,89 @@ def load_ser_model(model_name="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-rec
         ser_pipelines[model_name] = pipeline("audio-classification", model=model_name, device=device)
     return ser_pipelines[model_name]
 
-def transcribe_audio(file_path):
+def transcribe_with_whisperx(file_path, model_name="base"):
     """
-    Transcribes audio using Whisper and returns segments with timestamps.
+    Transcribes audio using WhisperX with word-level alignment.
     """
-    model = load_asr_model()
-    result = model.transcribe(file_path)
-    return result["segments"]
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    compute_type = "float16" if torch.cuda.is_available() else "int8" # or float32 for cpu
+    
+    print(f"Loading WhisperX model: {model_name} on {device} ({compute_type})...")
+    # 1. Transcribe with original whisper (batched)
+    model = whisperx.load_model(model_name, device, compute_type=compute_type)
+    audio = whisperx.load_audio(file_path)
+    result = model.transcribe(audio, batch_size=16)
+    
+    # Explicitly delete model to free memory
+    del model
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    # 2. Align whisper output
+    language_code = result["language"]
+    print(f"Detected language: {language_code}")
+    
+    print("Loading alignment model...")
+    model_a, metadata = whisperx.load_align_model(language_code=language_code, device=device)
+    
+    print("Aligning segments...")
+    result_aligned = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=False)
+    
+    # Explicitly delete alignment model
+    del model_a
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        
+    return result_aligned["segments"]
 
 def analyze_emotion(audio_segment, sr, model_name="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"):
     """
-    Analyzes emotion of a raw audio segment.
+    Analyzes emotion of a raw audio segment with post-processing.
     """
+    # Short segment handling
+    duration = len(audio_segment) / sr
+    if duration < 0.5:
+        return "neutral", 0.0
+
     pipe = load_ser_model(model_name)
-    # The pipeline expects a filename or numpy array.
-    # If numpy array, it might need specific handling depending on the pipeline version,
-    # but generally transformers pipelines handle numpy arrays if sampling rate is provided or assumed 16k.
-    # However, for safety and compatibility, we might need to ensure it's in the right format.
-    # The model 'ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition' is wav2vec2 based, usually 16kHz.
     
-    # We need to ensure the audio is 16kHz for most wav2vec2 models
+    # Pipeline prediction
+    # Ensure 16k
     if sr != 16000:
-        # Resample if necessary (though we should probably load at 16k)
-        audio_segment = librosa.resample(audio_segment, orig_sr=sr, target_sr=16000)
-        
-    # Pipeline expects a dict with "array" and "sampling_rate" or just the array if configured
-    # Let's try passing the dict
+         # This might be redundant if we load at 16k, but good for safety
+         pass 
+
     prediction = pipe({"array": audio_segment, "sampling_rate": 16000})
     
-    # Prediction is usually a list of dicts [{'label': 'angry', 'score': 0.9}, ...]
-    # We want the top one
-    top_emotion = prediction[0]
-    return top_emotion['label'], top_emotion['score']
+    # Post-processing logic
+    # prediction is list of dicts sorted by score desc
+    top1 = prediction[0]
+    top2 = prediction[1]
+    
+    emotion = top1['label']
+    confidence = top1['score']
+    
+    # Heuristic: if top 2 are close (< 5%), favor high arousal
+    if (top1['score'] - top2['score']) < 0.05:
+        high_arousal = ["happy", "angry", "fear", "surprise"]
+        if top2['label'] in high_arousal and top1['label'] not in high_arousal:
+            emotion = top2['label']
+            confidence = top2['score']
+            print(f"Tie-breaker: Switched {top1['label']} -> {top2['label']}")
+            
+    return emotion, confidence
 
 def process_audio_pipeline(file_path, ser_model_name="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"):
     """
-    Full pipeline: ASR -> Slicing -> SER -> Merge
+    Full pipeline: WhisperX ASR -> Slicing -> SER -> Merge
     """
-    # 1. ASR
-    print("Starting ASR...")
-    segments = transcribe_audio(file_path)
+    # 1. ASR (WhisperX)
+    print("Starting ASR (WhisperX)...")
+    segments = transcribe_with_whisperx(file_path)
     
     # 2. Load Audio for Slicing
-    # Load at 16k because SER model likely needs 16k
     print(f"Loading audio for SER (Model: {ser_model_name})...")
     y, sr = librosa.load(file_path, sr=16000)
     
@@ -89,16 +117,7 @@ def process_audio_pipeline(file_path, ser_model_name="ehcalabres/wav2vec2-lg-xls
         end_sample = int(end_time * sr)
         
         # Slice audio
-        # Add a small buffer or check bounds?
-        # Whisper timestamps can sometimes be slightly off or segments very short.
-        if end_sample - start_sample < 1600: # Skip very short segments (< 0.1s)
-             results.append({
-                "start": start_time,
-                "end": end_time,
-                "text": text,
-                "emotion": "neutral", # Default/Fallback
-                "confidence": 0.0
-            })
+        if end_sample - start_sample < 800: # Skip extremely short (< 0.05s)
              continue
 
         audio_slice = y[start_sample:end_sample]
@@ -126,13 +145,11 @@ def format_timestamp(seconds):
     Formats seconds into SRT timestamp format: HH:MM:SS,mmm
     """
     td = datetime.timedelta(seconds=seconds)
-    # Total seconds to hours, minutes, seconds, milliseconds
     total_seconds = int(td.total_seconds())
     hours = total_seconds // 3600
     minutes = (total_seconds % 3600) // 60
     secs = total_seconds % 60
     millis = int(td.microseconds / 1000)
-    
     return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
 
 def generate_srt(results):

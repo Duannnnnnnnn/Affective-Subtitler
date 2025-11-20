@@ -19,8 +19,8 @@ def create_dummy_audio(filename="test_audio.wav", duration=5, sr=16000):
 def test_pipeline():
     filename = create_dummy_audio()
     try:
-        print("Testing pipeline...")
-        # Note: Whisper might not detect any text in a sine wave, so segments might be empty.
+        print("Testing pipeline with WhisperX...")
+        # Note: WhisperX might not detect any text in a sine wave, so segments might be empty.
         # This is expected. We just want to ensure models load and function runs.
         results = utils.process_audio_pipeline(filename)
         print("Pipeline finished successfully.")
