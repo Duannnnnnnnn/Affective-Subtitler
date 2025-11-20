@@ -2,7 +2,7 @@
 
 A deep learning-based web application that analyzes audio/video files to perform **Speech-to-Text (ASR)** and **Speech Emotion Recognition (SER)**. It generates emotion-annotated subtitle files (.SRT) with precise timestamps and provides comprehensive emotion analysis visualizations.
 
-## ✨ Key Features
+## Key Features
 
 ### 1. Word-Level Speech Recognition
 - **WhisperX Integration**: Advanced ASR with forced alignment for word-level accuracy
@@ -28,7 +28,7 @@ A deep learning-based web application that analyzes audio/video files to perform
 - **Emotion Tags**: Each subtitle line tagged with detected emotion
 - **Download Ready**: One-click download with proper formatting
 
-## 🛠️ Technical Stack
+## Technical Stack
 
 ### Core Technologies
 - **ASR Engine**: [WhisperX](https://github.com/m-bain/whisperX) - Whisper with forced alignment
@@ -47,7 +47,7 @@ A deep learning-based web application that analyzes audio/video files to perform
 - **Memory Management**: Explicit model cleanup and CUDA cache clearing
 - **Error Handling**: Robust fallback mechanisms for various edge cases
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### 1. Environment Setup
 We recommend using a dedicated Conda environment to avoid dependency conflicts.
@@ -78,7 +78,7 @@ The application automatically detects CUDA availability:
 - **WhisperX (ASR)**: Runs on CPU (stability priority)
 - **SER Models**: Runs on GPU if available (performance priority)
 
-## 📖 Usage
+## Usage
 
 ### Running the Application
 Use the provided helper script that configures environment variables:
@@ -103,7 +103,7 @@ streamlit run app.py
    - Browse word frequency analysis per emotion
    - Download the generated .SRT subtitle file
 
-## 🧠 How It Works
+## How It Works
 
 ### Processing Pipeline
 ```
@@ -132,7 +132,7 @@ The system detects the following emotions:
 - **Short Segment Filter**: Segments < 0.5s automatically labeled as "neutral"
 - **Case Normalization**: All emotion labels normalized to lowercase for consistent processing
 
-## 🎨 Visualization Features
+## Visualization Features
 
 ### 1. Emotion Timeline
 - X-axis: Time in seconds
@@ -154,7 +154,7 @@ The system detects the following emotions:
   - Color scheme adapts to emotion type
   - Chinese character support via font auto-detection
 
-## 🌐 Multilingual Support
+## Multilingual Support
 
 ### Chinese Language
 - **Tokenization**: jieba for accurate word segmentation
@@ -166,7 +166,7 @@ The system detects the following emotions:
 - **Stop Words**: 70+ common English stop words filtered
 - **Full Compatibility**: All features work seamlessly
 
-## 📝 Models Used
+## Models Used
 
 ### ASR Model
 - **WhisperX** (base model)
@@ -179,7 +179,7 @@ The system detects the following emotions:
 - **Alternative**: `ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition`
 - Running on GPU with float16 precision (if available)
 
-## ⚠️ Known Warnings
+## Known Warnings
 
 You may see the following warnings during startup, which can be **safely ignored**:
 
@@ -201,7 +201,7 @@ You may see the following warnings during startup, which can be **safely ignored
    ```
    - UI displays correctly; will update in future versions
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables (via `run_app.sh`)
 - `LD_LIBRARY_PATH`: Points to PyTorch's bundled CUDA libraries
@@ -210,7 +210,7 @@ You may see the following warnings during startup, which can be **safely ignored
 ### Model Selection
 Use the sidebar dropdown to switch between SER models during runtime.
 
-## 📊 Output Formats
+## Output Formats
 
 ### SRT Subtitle File
 ```
@@ -223,18 +223,18 @@ Use the sidebar dropdown to switch between SER models during runtime.
 [SAD] I'm disappointed about this.
 ```
 
-## 🤝 Contributing
+## Contributing
 
 This project uses:
 - Python 3.10
 - Git for version control
 - Conda for environment management
 
-## 📄 License
+## License
 
 MIT License - See LICENSE file for details
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [WhisperX](https://github.com/m-bain/whisperX) for advanced ASR
 - [Hugging Face](https://huggingface.co/) for SER models
