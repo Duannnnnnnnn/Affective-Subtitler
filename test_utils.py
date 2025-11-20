@@ -42,8 +42,17 @@ def test_ser_explicitly():
     try:
         # Create a dummy audio segment (1 second of noise)
         dummy_audio = np.random.uniform(-1, 1, 16000)
+        
+        # Test default model
+        print("Testing default model...")
         emotion, confidence = utils.analyze_emotion(dummy_audio, 16000)
-        print(f"SER Test Result: Emotion={emotion}, Confidence={confidence}")
+        print(f"Default SER Result: Emotion={emotion}, Confidence={confidence}")
+        
+        # Test superb model
+        print("Testing superb model...")
+        emotion, confidence = utils.analyze_emotion(dummy_audio, 16000, model_name="superb/wav2vec2-base-superb-er")
+        print(f"Superb SER Result: Emotion={emotion}, Confidence={confidence}")
+        
     except Exception as e:
         print(f"SER Test Failed: {e}")
 

@@ -18,14 +18,17 @@ def load_asr_model(model_name="base"):
         asr_model = whisper.load_model(model_name, device=device)
     return asr_model
 
+# Cache for multiple models
+ser_pipelines = {}
+
 def load_ser_model(model_name="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"):
-    global ser_pipeline
-    if ser_pipeline is None:
+    global ser_pipelines
+    if model_name not in ser_pipelines:
         device = 0 if torch.cuda.is_available() else -1
         print(f"Loading SER model: {model_name} on device {device}...")
         # Using the audio-classification pipeline
-        ser_pipeline = pipeline("audio-classification", model=model_name, device=device)
-    return ser_pipeline
+        ser_pipelines[model_name] = pipeline("audio-classification", model=model_name, device=device)
+    return ser_pipelines[model_name]
 
 def transcribe_audio(file_path):
     """
@@ -35,11 +38,11 @@ def transcribe_audio(file_path):
     result = model.transcribe(file_path)
     return result["segments"]
 
-def analyze_emotion(audio_segment, sr):
+def analyze_emotion(audio_segment, sr, model_name="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"):
     """
     Analyzes emotion of a raw audio segment.
     """
-    pipe = load_ser_model()
+    pipe = load_ser_model(model_name)
     # The pipeline expects a filename or numpy array.
     # If numpy array, it might need specific handling depending on the pipeline version,
     # but generally transformers pipelines handle numpy arrays if sampling rate is provided or assumed 16k.
@@ -60,7 +63,7 @@ def analyze_emotion(audio_segment, sr):
     top_emotion = prediction[0]
     return top_emotion['label'], top_emotion['score']
 
-def process_audio_pipeline(file_path):
+def process_audio_pipeline(file_path, ser_model_name="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"):
     """
     Full pipeline: ASR -> Slicing -> SER -> Merge
     """
@@ -70,7 +73,7 @@ def process_audio_pipeline(file_path):
     
     # 2. Load Audio for Slicing
     # Load at 16k because SER model likely needs 16k
-    print("Loading audio for SER...")
+    print(f"Loading audio for SER (Model: {ser_model_name})...")
     y, sr = librosa.load(file_path, sr=16000)
     
     results = []
@@ -102,7 +105,7 @@ def process_audio_pipeline(file_path):
         
         # 3. SER
         try:
-            emotion, confidence = analyze_emotion(audio_slice, sr)
+            emotion, confidence = analyze_emotion(audio_slice, sr, model_name=ser_model_name)
         except Exception as e:
             print(f"Error in SER for segment {start_time}-{end_time}: {e}")
             emotion = "unknown"

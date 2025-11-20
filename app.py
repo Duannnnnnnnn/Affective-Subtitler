@@ -14,6 +14,17 @@ st.markdown("### Generate Subtitles with Emotion Recognition")
 st.sidebar.header("1. Upload File")
 uploaded_file = st.sidebar.file_uploader("Upload Audio/Video", type=["wav", "mp3", "mp4"])
 
+st.sidebar.header("2. Model Settings")
+ser_model_option = st.sidebar.selectbox(
+    "Select SER Model",
+    (
+        "ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition",
+        "superb/wav2vec2-base-superb-er"
+    ),
+    index=0,
+    help="Choose the emotion recognition model. 'superb' might be more robust for general audio."
+)
+
 if uploaded_file is not None:
     # Save uploaded file to a temporary file
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1])
@@ -31,7 +42,7 @@ if uploaded_file is not None:
         with st.spinner("Analyzing audio... This may take a while (ASR + SER)..."):
             try:
                 # Run the pipeline
-                results = utils.process_audio_pipeline(file_path)
+                results = utils.process_audio_pipeline(file_path, ser_model_name=ser_model_option)
                 
                 # Store results in session state to persist
                 st.session_state['results'] = results
